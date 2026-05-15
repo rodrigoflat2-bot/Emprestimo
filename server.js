@@ -1,4 +1,6 @@
-require('dotenv').config();
+if (!process.env.VERCEL) {
+  require('dotenv').config();
+}
 
 const express = require('express');
 const path = require('path');
@@ -13,17 +15,54 @@ const app = express();
 const JWT_SECRET = process.env.JWT_SECRET || 'emprestimos-app-secret-dev-2026';
 
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.resolve(__dirname, 'public')));
 app.use(cookieParser());
 app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
+app.set('views', path.resolve(__dirname, 'views'));
+
+// Debug route (before auth/middleware blocks)
+app.get('/_debug', (req, res) => {
+  const su = process.env.SUPABASE_URL;
+  const sk = process.env.SUPABASE_ANON_KEY;
+  res.json({
+    SUPABASE_URL: su ? su.substring(0, 20) + '...' : '(vazio)',
+    SUPABASE_ANON_KEY: sk ? sk.substring(0, 10) + '...' : '(vazio)',
+    supabase_loaded: supabase !== null,
+    VERCEL: process.env.VERCEL || '(não definido)',
+    NODE_ENV: process.env.NODE_ENV || '(não definido)',
+    cwd: process.cwd()
+  });
+});
 
 function checkSupabase(req, res, next) {
   if (!supabase) {
+    const su = process.env.SUPABASE_URL;
+    const sk = process.env.SUPABASE_ANON_KEY;
     return res.status(500).send(`
-      <h3>Erro de configuração</h3>
-      <p>Supabase não configurado. Defina as variáveis <strong>SUPABASE_URL</strong> e <strong>SUPABASE_ANON_KEY</strong>.</p>
-      <p>Crie um arquivo <code>.env</code> baseado no <code>.env.example</code> e reinicie o servidor.</p>
+      <style>body{font-family:sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;background:#f8f9fa}.card{background:#fff;padding:2rem;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.1);max-width:500px;text-align:center}h3{color:#dc3545}code{background:#e9ecef;padding:2px 6px;border-radius:4px;font-size:.9em}ol{text-align:left}pre{text-align:left;font-size:.8em;background:#f5f5f5;padding:8px;border-radius:6px}</style>
+      <div class="card">
+        <h3>Erro de configuração</h3>
+        <p>Supabase não configurado. Defina as variáveis <strong>SUPABASE_URL</strong> e <strong>SUPABASE_ANON_KEY</strong>.</p>
+        <hr>
+        <p style="font-size:.9em"><strong>Na Vercel:</strong></p>
+        <ol style="font-size:.85em;color:#555">
+          <li>Acesse o <strong>Dashboard da Vercel</strong></li>
+          <li>Seu projeto → <strong>Settings</strong> → <strong>Environment Variables</strong></li>
+          <li>Adicione:
+            <br><code>SUPABASE_URL</code>
+            <br><code>SUPABASE_ANON_KEY</code>
+          </li>
+          <li>Marque a opção <strong>Production</strong></li>
+          <li>Clique em <strong>Save</strong> e faça um <strong>Redeploy</strong></li>
+        </ol>
+        <hr>
+        <p style="font-size:.85em;color:#999">Debug:</p>
+        <pre>SUPABASE_URL: ${su ? su.substring(0, 25) + '...' : '(vazio)'}
+SUPABASE_ANON_KEY: ${sk ? sk.substring(0, 10) + '... (' + sk.length + ' chars)' : '(vazio)'}
+VERCEL: ${process.env.VERCEL || 'não'}
+cwd: ${process.cwd()}
+__dirname: ${__dirname}</pre>
+      </div>
     `);
   }
   next();
@@ -744,6 +783,20 @@ app.get('/resumo', async (req, res) => {
     console.error('Erro no resumo:', e.message);
     res.render('resumo', { resumoClientes: [], mesesArray: [], rotulosTipo });
   }
+});
+
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('UNHANDLED ERROR:', err);
+  res.status(500).send(`
+    <style>body{font-family:sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;background:#f8f9fa}.card{background:#fff;padding:2rem;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.1);max-width:600px}</style>
+    <div class="card">
+      <h3>Internal Server Error</h3>
+      <p style="color:#666">${err.message}</p>
+      <hr>
+      <pre style="font-size:.8em;color:#999;overflow:auto;max-height:300px">${err.stack}</pre>
+    </div>
+  `);
 });
 
 // Export for Vercel serverless
