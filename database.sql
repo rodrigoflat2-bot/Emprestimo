@@ -1,5 +1,3 @@
--- Execute this SQL in the Supabase SQL Editor (https://supabase.com/dashboard/project/_/sql/new)
-
 CREATE TABLE IF NOT EXISTS clientes (
   id SERIAL PRIMARY KEY,
   nome TEXT NOT NULL,

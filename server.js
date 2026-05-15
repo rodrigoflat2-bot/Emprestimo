@@ -21,15 +21,17 @@ app.set('view engine', 'ejs');
 app.set('views', path.resolve(__dirname, 'views'));
 
 // Debug route
-app.get('/_debug', (req, res) => {
+app.get('/_debug', async (req, res) => {
   const su = process.env.SUPABASE_URL;
   const sk = process.env.SUPABASE_ANON_KEY;
+  const testResult = await supabase.count('usuarios').then(r => r).catch(e => 'ERRO: ' + e.message);
   res.json({
     SUPABASE_URL: su ? su.substring(0, 20) + '...' : '(vazio)',
     SUPABASE_ANON_KEY: sk ? sk.substring(0, 10) + '...' : '(vazio)',
     supabase_loaded: !!supabase.getApiUrl(),
     VERCEL: process.env.VERCEL || '(não definido)',
-    node: process.version
+    node: process.version,
+    test_count_usuarios: testResult
   });
 });
 
@@ -87,7 +89,7 @@ app.get('/login', async (req, res) => {
     res.render('login', { semUsuarios: total === 0, erro: req.query.erro || null });
   } catch (e) {
     console.error('Erro login:', e.message);
-    res.render('login', { semUsuarios: true, erro: 'Erro ao conectar com banco de dados' });
+    res.render('login', { semUsuarios: true, erro: 'Erro ao conectar: ' + e.message });
   }
 });
 
